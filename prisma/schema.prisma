@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model sensors {
+  id_sensors String    @id @default(uuid())
+  name       String    @unique
+  date       DateTime  @default(now())
+  
+  samples    sensor_samples[]
+  events     sensor_events[]
+}
+
+model sensor_samples {
+  id_sample   Int      @id @default(autoincrement())
+  voltage     Float
+  temperature Float
+  date        DateTime @default(now())
+  
+  id_sensors String
+  sensor     sensors  @relation(fields: [id_sensors], references: [id_sensors])
+  events     sensor_events[]
+  
+  @@unique([id_sensors, date]) // Restricción UNIQUE compuesta
+}
+
+model sensor_events {
+  id_event    Int       @id @default(autoincrement())
+  event       event_type
+  date        DateTime  @default(now())
+  
+  id_sensors String
+  sensor     sensors    @relation(fields: [id_sensors], references: [id_sensors])
+  
+  id_sample  Int?
+  sample     sensor_samples? @relation(fields: [id_sample], references: [id_sample])
+}
+
+enum event_type {
+  critique
+  preventive
+  emergency
+}
+
+

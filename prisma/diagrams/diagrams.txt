@@ -1,0 +1,25 @@
+Table sensors {
+  id_sensors String [primary key, default: `uuid()`]
+  name String [unique]
+  date datetime [default: `now()`]
+}
+
+Table sensor_samples {
+  id_sample Integer [primary key, increment]
+  voltage Float
+  temperature Float
+  date datetime [default: `now()`]
+  id_sensors String [ref: > sensors.id_sensors]
+  
+  indexes {
+    (id_sensors, date) [unique]  // Restricción UNIQUE compuesta
+  }
+}
+
+Table sensor_events {
+  id_event Integer [primary key, increment]
+  event Enum("critique", "preventive", "emergency")
+  date datetime [default: `now()`]
+  id_sensors String [ref: > sensors.id_sensors]
+  id_sample Integer [ref: > sensor_samples.id_sample, null]
+}

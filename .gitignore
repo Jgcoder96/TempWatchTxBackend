@@ -1,2 +1,6 @@
-node_modules/
+*.env
 dist/
+node_modules/
+pgadmin/
+temp_watch_db/
+/src/generated/prisma

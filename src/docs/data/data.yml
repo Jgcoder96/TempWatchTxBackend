@@ -1,0 +1,136 @@
+openapi: 3.0.1
+info:
+  title: API de Sensores
+  description: Endpoints para gestión de lecturas de sensores
+  version: 1.0.0
+
+paths:
+  /api/data:
+    post:
+      tags:
+        - data
+      summary: Endpoint para almacenar las mediciones recibidas desde los sensores
+      description: Este servicio permite registrar las lecturas de los sensores en la base de datos.
+      operationId: storeSensorReadings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: array
+                  minItems: 1
+                  description: Lista de lecturas de sensores (mínimo 1 registro)
+                  items:
+                    type: object
+                    required:
+                      - id_sensors
+                      - voltage
+                      - temperature
+                    properties:
+                      id_sensors:
+                        type: string
+                        format: uuid
+                        description: Identificador único del sensor (UUID v4)
+                        example: "1617eb36-d677-44d9-add1-f9ee84da4d91"
+                      voltage:
+                        type: number
+                        format: float
+                        minimum: 0
+                        description: Valor de voltaje en voltios (V)
+                        example: 5.8
+                      temperature:
+                        type: number
+                        format: float
+                        description: Valor de temperatura en grados Celsius (°C)
+                        example: 6.8
+                  example:
+                    - id_sensors: "1617eb36-d677-44d9-add1-f9ee84da4d91"
+                      voltage: 40
+                      temperature: 70
+                    - id_sensors: "057f4ad8-fd5e-4337-bbaa-649abb7fdf2c"
+                      voltage: 50
+                      temperature: 80
+                    - id_sensors: "ab9865f0-3e68-4e2c-98e1-fd1936c452eb"
+                      voltage: 70
+                      temperature: 100
+                    - id_sensors: "731e6ebb-4ddd-4fb0-8b01-14c61f7a61f6"
+                      voltage: 90
+                      temperature: 130
+      responses:
+        '201':
+          description: Los datos se registraron correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Lecturas guardadas exitosamente (4 registros)"
+        '400':
+          description: Error en los parámetros
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Parámetros incorrectos en el cuerpo de la solicitud."
+        '404':
+          description: Ruta no encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Ruta no encontrada."
+        '409':
+          description: Conflicto de datos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res:
+                    type: boolean
+                  message:
+                    type: string
+              examples:
+                RegistroExistente:
+                  value:
+                    res: false
+                    message: "El registro ya existe en la base de datos."
+                SensorNoRegistrado:
+                  value:
+                    res: false
+                    message: "El sensor no se encuentra registrado en la base de datos."
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  res:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "Error interno del servidor."

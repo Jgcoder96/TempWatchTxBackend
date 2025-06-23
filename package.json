@@ -6,7 +6,8 @@
     "dev": "tsnd --respawn --clear src/main.ts",
     "build": "rimraf ./dist && tsc",
     "start": "npm run build && node dist/main.js",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsnd --clear src/modules/telegram/helpers/generateGraph.helper.ts"
   },
   "keywords": [],
   "author": "",
@@ -36,8 +37,12 @@
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",
+    "chart.js": "^4.5.0",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "date-fns": "^4.1.0",
     "express": "^5.1.0",
     "morgan": "^1.10.0",
+    "skia-canvas": "^2.0.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "zod": "^3.25.64"

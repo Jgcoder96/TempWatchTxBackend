@@ -1,16 +1,29 @@
 import { models } from '../models';
-import type { SensorData } from '../types';
 import { err } from '../errors';
-
-interface ServerResponse {
-  res: boolean;
-  statusCode: number;
-  message: string;
-}
+import type { SensorData, ServerResponse } from '../types';
 
 export const saveData = async (data: SensorData[]): Promise<ServerResponse> => {
   try {
-    await models.saveData(data);
+    const sensorDataParsed = data.map((item) => {
+      const eventData = item.status
+        ? {
+            event: item.status,
+            id_sensors: item.id_sensors,
+          }
+        : null;
+
+      return {
+        sampleData: {
+          voltage: item.voltage,
+          temperature: item.temperature,
+          id_sensors: item.id_sensors,
+        },
+        eventData,
+      };
+    });
+
+    await models.saveData(sensorDataParsed);
+
     const response: ServerResponse = {
       res: true,
       statusCode: 201,

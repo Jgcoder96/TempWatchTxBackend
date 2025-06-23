@@ -1,10 +1,6 @@
 import type { Request, Response } from 'express';
 import { services } from '../services';
-interface ServerResponse {
-  res: boolean;
-  statusCode: number;
-  message: string;
-}
+import type { ServerResponse } from '../types';
 
 export const saveData = async (req: Request, res: Response) => {
   try {

@@ -37,20 +37,15 @@ model sensor_samples {
 
 model sensor_events {
   id_event    Int       @id @default(autoincrement())
-  event       event_type
-  date        DateTime  @default(now())
+  event       String    
   
   id_sensors String
   sensor     sensors    @relation(fields: [id_sensors], references: [id_sensors])
   
   id_sample  Int?
   sample     sensor_samples? @relation(fields: [id_sample], references: [id_sample])
+  
 }
 
-enum event_type {
-  critique
-  preventive
-  emergency
-}
 
 

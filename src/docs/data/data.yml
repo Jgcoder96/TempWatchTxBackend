@@ -48,19 +48,48 @@ paths:
                         format: float
                         description: Valor de temperatura en grados Celsius (°C)
                         example: 6.8
-                  example:
-                    - id_sensors: "1617eb36-d677-44d9-add1-f9ee84da4d91"
+                      status:
+                        type: string
+                        enum: ["normal", "preventive", "emergency"]
+                        description: Estado del sensor (opcional)
+                        example: "normal"
+            examples:
+              Lecturas_básicas:
+                summary: "Ejemplo sin estados"
+                value:
+                  data:
+                    - id_sensors: "f5deb1d4-3eb3-41b7-a4bb-cba02954ae8d"
                       voltage: 40
                       temperature: 70
-                    - id_sensors: "057f4ad8-fd5e-4337-bbaa-649abb7fdf2c"
+                    - id_sensors: "593740d7-5284-4226-abe9-b19c42dce662"
                       voltage: 50
                       temperature: 80
-                    - id_sensors: "ab9865f0-3e68-4e2c-98e1-fd1936c452eb"
+                    - id_sensors: "fdc21238-2c88-4df6-9759-c89da74aef3e"
                       voltage: 70
                       temperature: 100
-                    - id_sensors: "731e6ebb-4ddd-4fb0-8b01-14c61f7a61f6"
+                    - id_sensors: "e5ec1e01-8fb4-47f3-9510-af2b2be20c86"
                       voltage: 90
                       temperature: 130
+              Lecturas_con_estados:
+                summary: "Ejemplo con estados"
+                value:
+                  data:
+                    - id_sensors: "f5deb1d4-3eb3-41b7-a4bb-cba02954ae8d"
+                      voltage: 40
+                      temperature: 70
+                      status: "normal"
+                    - id_sensors: "593740d7-5284-4226-abe9-b19c42dce662"
+                      voltage: 50
+                      temperature: 80
+                      status: "preventive"
+                    - id_sensors: "fdc21238-2c88-4df6-9759-c89da74aef3e"
+                      voltage: 70
+                      temperature: 100
+                      status: "emergency"
+                    - id_sensors: "e5ec1e01-8fb4-47f3-9510-af2b2be20c86"
+                      voltage: 90
+                      temperature: 130
+                      status: "normal"
       responses:
         '201':
           description: Los datos se registraron correctamente
@@ -74,7 +103,7 @@ paths:
                     example: true
                   message:
                     type: string
-                    example: "Lecturas guardadas exitosamente (4 registros)"
+                    example: "Los datos se registraron correctamente."
         '400':
           description: Error en los parámetros
           content:

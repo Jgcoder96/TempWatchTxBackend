@@ -28,11 +28,11 @@ paths:
                   items:
                     type: object
                     required:
-                      - id_sensors
+                      - id_sensor
                       - voltage
                       - temperature
                     properties:
-                      id_sensors:
+                      id_sensor:
                         type: string
                         format: uuid
                         description: Identificador único del sensor (UUID v4)
@@ -58,38 +58,42 @@ paths:
                 summary: "Ejemplo sin estados"
                 value:
                   data:
-                    - id_sensors: "f5deb1d4-3eb3-41b7-a4bb-cba02954ae8d"
+                    - id_sensor: "03136b1f-65e1-4d92-ae19-8ba71876cdb5"
                       voltage: 40
                       temperature: 70
-                    - id_sensors: "593740d7-5284-4226-abe9-b19c42dce662"
+                    - id_sensor: "f418cf2e-22fb-40e3-9f31-2578d79db87f"
                       voltage: 50
                       temperature: 80
-                    - id_sensors: "fdc21238-2c88-4df6-9759-c89da74aef3e"
+                    - id_sensor: "90f7ec5d-56c9-423d-92ea-9721b685f9f9"
                       voltage: 70
                       temperature: 100
-                    - id_sensors: "e5ec1e01-8fb4-47f3-9510-af2b2be20c86"
+                    - id_sensor: "74ede588-0fdc-4a85-8232-6455e163dbfb"
                       voltage: 90
                       temperature: 130
               Lecturas_con_estados:
                 summary: "Ejemplo con estados"
                 value:
                   data:
-                    - id_sensors: "f5deb1d4-3eb3-41b7-a4bb-cba02954ae8d"
+                    - id_sensor: "03136b1f-65e1-4d92-ae19-8ba71876cdb5"
                       voltage: 40
                       temperature: 70
                       status: "normal"
-                    - id_sensors: "593740d7-5284-4226-abe9-b19c42dce662"
+                      motor_speed: "off"
+                    - id_sensor: "f418cf2e-22fb-40e3-9f31-2578d79db87f"
                       voltage: 50
                       temperature: 80
                       status: "preventive"
-                    - id_sensors: "fdc21238-2c88-4df6-9759-c89da74aef3e"
+                      motor_speed: "normal"
+                    - id_sensor: "90f7ec5d-56c9-423d-92ea-9721b685f9f9"
                       voltage: 70
                       temperature: 100
                       status: "emergency"
-                    - id_sensors: "e5ec1e01-8fb4-47f3-9510-af2b2be20c86"
+                      motor_speed: "high"
+                    - id_sensor: "74ede588-0fdc-4a85-8232-6455e163dbfb"
                       voltage: 90
                       temperature: 130
                       status: "normal"
+                      motor_speed: "off"
       responses:
         '201':
           description: Los datos se registraron correctamente

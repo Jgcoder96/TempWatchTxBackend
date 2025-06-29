@@ -5,18 +5,19 @@ import type { SensorData, ServerResponse } from '../types';
 export const saveData = async (data: SensorData[]): Promise<ServerResponse> => {
   try {
     const sensorDataParsed = data.map((item) => {
-      const eventData = item.status
-        ? {
-            event: item.status,
-            id_sensors: item.id_sensors,
-          }
-        : null;
+      const eventData =
+        item.status && item.motor_speed
+          ? {
+              event: item.status,
+              motor_speed: item.motor_speed,
+            }
+          : null;
 
       return {
         sampleData: {
           voltage: item.voltage,
           temperature: item.temperature,
-          id_sensors: item.id_sensors,
+          id_sensor: item.id_sensor,
         },
         eventData,
       };

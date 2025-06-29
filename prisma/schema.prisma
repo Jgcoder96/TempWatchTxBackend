@@ -14,38 +14,41 @@ datasource db {
 }
 
 model sensors {
-  id_sensors String    @id @default(uuid())
-  name       String    @unique
-  date       DateTime  @default(now())
+  id_sensor       String           @id @default(uuid())
+  name            String           @unique
+  date            DateTime         @default(now())
   
-  samples    sensor_samples[]
-  events     sensor_events[]
+  samples         sensor_samples[]
 }
 
 model sensor_samples {
-  id_sample   Int      @id @default(autoincrement())
-  voltage     Float
-  temperature Float
-  date        DateTime @default(now())
+  id_sample       Int               @id @default(autoincrement())
+  voltage         Float
+  temperature     Float
+  date            DateTime          @default(now())
+
+  id_sensor       String
+  sensor          sensors           @relation(fields: [id_sensor], references: [id_sensor])
+  events          sensor_events[]
+  motor_events    motor_events[]
   
-  id_sensors String
-  sensor     sensors  @relation(fields: [id_sensors], references: [id_sensors])
-  events     sensor_events[]
-  
-  @@unique([id_sensors, date]) // Restricción UNIQUE compuesta
+  @@unique([id_sensor, date])
 }
 
 model sensor_events {
-  id_event    Int       @id @default(autoincrement())
-  event       String    
-  
-  id_sensors String
-  sensor     sensors    @relation(fields: [id_sensors], references: [id_sensors])
-  
-  id_sample  Int?
-  sample     sensor_samples? @relation(fields: [id_sample], references: [id_sample])
-  
+  id_event         Int               @id @default(autoincrement())
+  event            String
+
+  id_sample        Int?
+  sample           sensor_samples?   @relation(fields: [id_sample], references: [id_sample])
 }
 
+model motor_events {
+  id_motor_event   Int               @id @default(autoincrement())
+  speed            String
+
+  id_sample        Int?
+  sample           sensor_samples?     @relation(fields: [id_sample], references: [id_sample])
+}
 
 

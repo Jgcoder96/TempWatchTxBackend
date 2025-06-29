@@ -36,11 +36,11 @@ export const generateGraph = async () => {
   try {
     const datos = await getDataByDate(
       {
-        day: 19,
+        day: 26,
         month: 6,
         year: 2025,
       },
-      '046295c5-4808-47a9-88ac-2e86cc688b5c',
+      '593740d7-5284-4226-abe9-b19c42dce662',
     );
 
     // Calcular valores para el eje Y
@@ -79,7 +79,7 @@ export const generateGraph = async () => {
               x: new Date(d.date).getTime(),
               y: d.temperature,
             })),
-            borderColor: 'rgba(75, 192, 192, 1)',
+            borderColor: '#4CAF50',
             borderWidth: 2,
             fill: false,
             tension: 0.1,

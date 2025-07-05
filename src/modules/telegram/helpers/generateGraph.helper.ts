@@ -10,9 +10,12 @@ import {
   ChartItem,
 } from 'chart.js';
 import { Canvas } from 'skia-canvas';
-import { getDataByDate } from '../models';
 import 'chartjs-adapter-date-fns';
-import fsp from 'node:fs/promises';
+
+interface Data {
+  temperature: number;
+  date: Date;
+}
 
 Chart.register(
   LineController,
@@ -32,22 +35,11 @@ function roundDownToNearest(value: number, multiple: number) {
   return Math.floor(value / multiple) * multiple;
 }
 
-export const generateGraph = async () => {
+export const generateGraph = async (data: Data[]) => {
   try {
-    const datos = await getDataByDate(
-      {
-        day: 26,
-        month: 6,
-        year: 2025,
-      },
-      '593740d7-5284-4226-abe9-b19c42dce662',
-    );
-
-    // Calcular valores para el eje Y
-    const temperaturas = datos.map((d) => d.temperature);
+    const temperaturas = data.map((d) => d.temperature);
     const maxTemp = Math.max(...temperaturas);
 
-    // Determinar el múltiplo adecuado para redondear
     let roundMultiple;
     if (maxTemp <= 10) {
       roundMultiple = 1;
@@ -62,8 +54,7 @@ export const generateGraph = async () => {
     const maxRounded = roundUpToNearest(maxTemp, roundMultiple);
     const stepSize = roundMultiple;
 
-    // Calcular el rango dinámico del eje X (hora)
-    const tiempos = datos.map((d) => new Date(d.date).getTime());
+    const tiempos = data.map((d) => new Date(d.date).getTime());
     const minTime = roundDownToNearest(Math.min(...tiempos), 1000 * 60 * 60); // Redondea a la hora inferior
     const maxTime = roundUpToNearest(Math.max(...tiempos), 1000 * 60 * 60); // Redondea a la hora superior
 
@@ -75,7 +66,7 @@ export const generateGraph = async () => {
         datasets: [
           {
             label: 'Temperatura (°C)',
-            data: datos.map((d) => ({
+            data: data.map((d) => ({
               x: new Date(d.date).getTime(),
               y: d.temperature,
             })),
@@ -226,13 +217,10 @@ export const generateGraph = async () => {
     });
 
     const pngBuffer = await canvas.toBuffer('png', { matte: 'white' });
-    await fsp.writeFile('temperature-chart.png', pngBuffer);
-    console.log('✅ Gráfico generado como temperature-chart.png');
-
     chart.destroy();
+    return pngBuffer;
   } catch (error) {
     console.error('❌ Error al generar el gráfico:', error);
+    throw error;
   }
 };
-
-generateGraph();

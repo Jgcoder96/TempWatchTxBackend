@@ -1,0 +1,1 @@
+export { botTelegraf } from './botTelegraf';

@@ -12,7 +12,9 @@ interface reportFilters {
   };
 }
 
-export const generateReport = async (filters: reportFilters) => {
+export const generateReport = async (
+  filters: reportFilters,
+): Promise<Buffer> => {
   try {
     const { id_sensor, date }: reportFilters = filters;
 
@@ -38,21 +40,15 @@ export const generateReport = async (filters: reportFilters) => {
     const parseSensorEvents = parseSensorEvent(sensorEvents);
 
     const graph = await generateGraph(sensorData);
-    await generarReportePDF(id_sensor, newDate, graph, parseSensorEvents);
+    const report: Buffer = await generarReportePDF(
+      id_sensor,
+      newDate,
+      graph,
+      parseSensorEvents,
+    );
+    return report;
   } catch (error) {
     console.log(error);
+    throw error;
   }
 };
-
-(async () => {
-  const filters: reportFilters = {
-    id_sensor: '03136b1f-65e1-4d92-ae19-8ba71876cdb5',
-    date: {
-      day: 1,
-      month: 7,
-      year: 2025,
-    },
-  };
-
-  await generateReport(filters);
-})();

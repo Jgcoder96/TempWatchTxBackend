@@ -1,14 +1,25 @@
-// botTelegraf.ts
-
-// --- CORRECCIÓN 1: Importa la clase TelegramError ---
-import { Telegraf, Markup, Context, TelegramError } from 'telegraf';
+import { Telegraf, Markup, Context, session, TelegramError } from 'telegraf';
 import { envs } from '../../../config';
 import { getSensorList, getLastSensorSample } from '../models';
 import { PrismaClient } from '@prisma/client';
+import { generateReport } from '../helpers';
 
 const prisma = new PrismaClient();
 
-const sendMainMenu = (ctx: Context, isEdit = false) => {
+interface ReportState {
+  step: 'awaiting_date';
+  sensorId: string;
+}
+
+interface MySession {
+  reportState?: ReportState;
+}
+
+interface MyContext extends Context {
+  session: MySession;
+}
+
+const sendMainMenu = (ctx: MyContext, isEdit = false) => {
   const nombreUsuario = ctx.from?.first_name || 'usuario';
   const text = `¡Hola, ${nombreUsuario}! 👋\n\nBienvenido a nuestro bot. ¿Qué te gustaría hacer?`;
 
@@ -18,17 +29,39 @@ const sendMainMenu = (ctx: Context, isEdit = false) => {
     Markup.button.callback('📄 Generar Reporte', 'generar_reporte'),
   ]);
 
-  if (isEdit) {
-    return ctx.editMessageText(text, keyboard);
+  try {
+    if (isEdit) {
+      return ctx.editMessageText(text, keyboard);
+    }
+    return ctx.reply(text, keyboard);
+  } catch (error) {
+    // Si editMessageText falla (ej. el mensaje es muy antiguo), envía uno nuevo.
+    console.error('Error sending main menu, sending new message.', error);
+    return ctx.reply(text, keyboard);
   }
-  return ctx.reply(text, keyboard);
 };
 
 export const botTelegraf = () => {
-  const bot = new Telegraf(envs.TELEGRAM_BOT_TOKEN);
+  const bot = new Telegraf<MyContext>(envs.TELEGRAM_BOT_TOKEN);
+
+  bot.use(
+    session({
+      defaultSession: () => ({}),
+    }),
+  );
+
+  const chunk = <T>(arr: T[], size: number): T[][] =>
+    Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+      arr.slice(i * size, i * size + size),
+    );
 
   bot.command('menu', (ctx) => sendMainMenu(ctx));
+
   bot.action('volver_menu', async (ctx) => {
+    if (ctx.session) {
+      delete ctx.session.reportState;
+    }
+
     await ctx.answerCbQuery('Volviendo al menú principal...');
     await sendMainMenu(ctx, true);
   });
@@ -89,11 +122,6 @@ export const botTelegraf = () => {
           `monitor:${sensor.id_sensor}`,
         ),
       );
-
-      const chunk = <T>(arr: T[], size: number): T[][] =>
-        Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
-          arr.slice(i * size, i * size + size),
-        );
 
       const keyboard = Markup.inlineKeyboard([
         ...chunk(sensorButtons, 2),
@@ -171,15 +199,120 @@ export const botTelegraf = () => {
   });
 
   bot.action('generar_reporte', async (ctx) => {
-    await ctx.answerCbQuery('Función no implementada todavía.');
+    try {
+      await ctx.answerCbQuery('Cargando lista de sensores...');
+      const sensores = await getSensorList();
+
+      if (!sensores || sensores.length === 0) {
+        return await ctx.editMessageText('❌ No se encontraron sensores.', {
+          reply_markup: Markup.inlineKeyboard([
+            Markup.button.callback('⬅️ Volver al menú', 'volver_menu'),
+          ]).reply_markup,
+        });
+      }
+
+      const sensorButtons = sensores.map((sensor) =>
+        Markup.button.callback(
+          `📄 ${sensor.name}`,
+          `report_sensor:${sensor.id_sensor}`,
+        ),
+      );
+
+      const keyboard = Markup.inlineKeyboard([
+        ...chunk(sensorButtons, 2),
+        [Markup.button.callback('⬅️ Volver al menú', 'volver_menu')],
+      ]);
+
+      await ctx.editMessageText(
+        'Selecciona un sensor para generar el reporte:',
+        keyboard,
+      );
+    } catch (error) {
+      console.error('Error en generar_reporte (paso 1):', error);
+      await ctx.editMessageText('❌ Ocurrió un error al cargar los sensores.');
+    }
+  });
+
+  bot.action(/^report_sensor:(.+)/, async (ctx) => {
+    const sensorId = ctx.match[1];
+
+    ctx.session.reportState = {
+      step: 'awaiting_date',
+      sensorId: sensorId,
+    };
+
+    await ctx.answerCbQuery();
     await ctx.editMessageText(
-      'Esta función para generar reportes estará disponible pronto.',
+      '📅 Por favor, ingresa la fecha para el reporte.\n\nUsa el formato: *DD/MM/AAAA*',
       {
+        parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
-          Markup.button.callback('⬅️ Volver al menú', 'volver_menu'),
+          Markup.button.callback('❌ Cancelar', 'cancel_report'),
         ]).reply_markup,
       },
     );
+  });
+
+  bot.action('cancel_report', async (ctx) => {
+    if (ctx.session) {
+      delete ctx.session.reportState;
+    }
+    await ctx.answerCbQuery('Operación cancelada.');
+    await sendMainMenu(ctx, true);
+  });
+
+  bot.on('text', async (ctx) => {
+    if (ctx.session?.reportState?.step !== 'awaiting_date') {
+      return;
+    }
+
+    const dateText = ctx.message.text;
+    const sensorId = ctx.session.reportState.sensorId;
+
+    const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const match = dateText.match(dateRegex);
+
+    if (!match) {
+      await ctx.reply(
+        'Formato de fecha inválido. 😕\nPor favor, inténtalo de nuevo con el formato *DD/MM/AAAA*.',
+        { parse_mode: 'Markdown' },
+      );
+      return;
+    }
+
+    await ctx.reply('Generando tu reporte, por favor espera un momento... ⏳');
+
+    try {
+      const [, day, month, year] = match;
+
+      const filters = {
+        id_sensor: sensorId,
+        date: {
+          day: parseInt(day, 10),
+          month: parseInt(month, 10),
+          year: parseInt(year, 10),
+        },
+      };
+
+      const pdfBuffer: Buffer = await generateReport(filters);
+
+      await ctx.sendDocument(
+        {
+          source: pdfBuffer,
+          filename: `Reporte-${sensorId}-${day}-${month}-${year}.pdf`,
+        },
+        {
+          caption: `✅ ¡Aquí tienes tu reporte para la fecha ${dateText}!`,
+        },
+      );
+    } catch (error) {
+      console.error('Error al generar o enviar el reporte PDF:', error);
+      await ctx.reply(
+        '❌ Lo siento, ocurrió un error al generar tu reporte. Por favor, asegúrate de que hay datos para esa fecha e inténtalo de nuevo.',
+      );
+    } finally {
+      delete ctx.session.reportState;
+    }
   });
 
   process.once('SIGINT', () =>

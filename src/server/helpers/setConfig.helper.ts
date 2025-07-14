@@ -4,6 +4,7 @@ import type { Express, Request, Response } from 'express';
 import { ServerRoutes } from '../config';
 import { setRoutes } from './index';
 import { botTelegraf } from '../../modules/telegram/server';
+import { envs } from '../../config';
 
 interface Options {
   app: Express;
@@ -13,18 +14,22 @@ interface Options {
 export const setConfig = ({ app, routes }: Options): Express => {
   app.use(express.json());
   app.use(morgan('dev'));
+
   setRoutes({ app, routes });
-  app.get(/^\/(?!api).*/, (req: Request, res: Response) => {
-    res.json({ res: false, message: 'ruta no encontrada' });
-  });
+
   const bot = botTelegraf();
 
   const secretPath = `/telegraf/${bot.secretPathComponent()}`;
-  bot.telegram.setWebhook(`https://temp-watch.loca.lt${secretPath}`);
+
+  bot.telegram.setWebhook(`${envs.URL}${secretPath}`);
+
   app.use(bot.webhookCallback(secretPath));
-  app.get('/', (req, res) => {
-    res.send('¡Hola! Soy un bot de Telegram corriendo en Express.');
+  app.use((req: Request, res: Response) => {
+    res.status(404).json({
+      res: false,
+      message: `Ruta no encontrada: ${req.method} ${req.originalUrl}`,
+    });
   });
-  console.log(`Ruta del Webhook (para configurar ngrok): ${secretPath}`);
+
   return app;
 };

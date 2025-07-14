@@ -31,6 +31,8 @@ export const generateReport = async (
       id_sensor,
     );
 
+    console.log(sensorData);
+
     const sensorEvents = await getEventsByDate(id_sensor, {
       day,
       month,

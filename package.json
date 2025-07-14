@@ -7,8 +7,7 @@
     "build": "rimraf ./dist && tsc",
     "start": "npm run build && node dist/main.js",
     "lint": "eslint",
-    "test": "tsnd --clear src/modules/telegram/models/getEventByDate.model.ts",
-    "pdf": "tsnd --clear src/modules/telegram/helpers/generateReport.helper.ts"
+    "prisma:migrate:deploy": "prisma migrate deploy"
   },
   "keywords": [],
   "author": "",

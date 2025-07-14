@@ -35,7 +35,6 @@ const sendMainMenu = (ctx: MyContext, isEdit = false) => {
     }
     return ctx.reply(text, keyboard);
   } catch (error) {
-    // Si editMessageText falla (ej. el mensaje es muy antiguo), envía uno nuevo.
     console.error('Error sending main menu, sending new message.', error);
     return ctx.reply(text, keyboard);
   }

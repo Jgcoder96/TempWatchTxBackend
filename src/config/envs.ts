@@ -7,5 +7,4 @@ export const envs = {
   TELEGRAM_BOT_TOKEN: get('TELEGRAM_BOT_TOKEN').required().asString(),
   URL: get('URL').required().asString(),
   PORT: get('PORT').default('8080').asPortNumber(),
-  HOST: get('HOST').default('localhost').asString(),
 };

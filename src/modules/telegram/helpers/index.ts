@@ -1,1 +1,2 @@
-export { generateReport } from './generateReport.helper';
+export { generateReportByDate } from './generateReportByDate.helper';
+export { generateReportByRange } from './generateReportByRange.helper';

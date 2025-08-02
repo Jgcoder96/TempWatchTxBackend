@@ -1,5 +1,9 @@
 import { getDataByRange, getEventsByRange } from '../models';
-import { generateGraph, generatePDFByRange, parseSensorEvent } from '../utils';
+import {
+  generateGraphByRange,
+  generatePDFByRange,
+  parseSensorEvent,
+} from '../utils';
 
 interface Date {
   day: number;
@@ -12,7 +16,7 @@ interface reportFilters {
   endDate: Date;
 }
 
-export const generateReport = async (
+export const generateReportByRange = async (
   filters: reportFilters,
 ): Promise<Buffer> => {
   try {
@@ -41,7 +45,7 @@ export const generateReport = async (
 
     const parseSensorEvents = parseSensorEvent(sensorEvents);
 
-    const graph = await generateGraph(sensorData);
+    const graph = await generateGraphByRange(sensorData);
 
     const report: Buffer = await generatePDFByRange(
       id_sensor,

@@ -36,7 +36,7 @@ paths:
                         type: string
                         format: uuid
                         description: Identificador único del sensor (UUID v4)
-                        example: "1617eb36-d677-44d9-add1-f9ee84da4d91"
+                        example: "36af59dc-fb08-471b-9246-0cda2b3147b2"
                       voltage:
                         type: number
                         format: float
@@ -58,38 +58,38 @@ paths:
                 summary: "Ejemplo sin estados"
                 value:
                   data:
-                    - id_sensor: "03136b1f-65e1-4d92-ae19-8ba71876cdb5"
+                    - id_sensor: "36af59dc-fb08-471b-9246-0cda2b3147b2"
                       voltage: 40
                       temperature: 70
-                    - id_sensor: "f418cf2e-22fb-40e3-9f31-2578d79db87f"
+                    - id_sensor: "6203df17-11fc-4530-9468-18bdd9d18f1b"
                       voltage: 50
                       temperature: 80
-                    - id_sensor: "90f7ec5d-56c9-423d-92ea-9721b685f9f9"
+                    - id_sensor: "7e4043ed-c71a-42b2-92e3-0fa6aeeb1fdc"
                       voltage: 70
                       temperature: 100
-                    - id_sensor: "74ede588-0fdc-4a85-8232-6455e163dbfb"
+                    - id_sensor: "e6eefc31-2b25-4aa6-9008-34592a173672"
                       voltage: 90
                       temperature: 130
               Lecturas_con_estados:
                 summary: "Ejemplo con estados"
                 value:
                   data:
-                    - id_sensor: "03136b1f-65e1-4d92-ae19-8ba71876cdb5"
+                    - id_sensor: "36af59dc-fb08-471b-9246-0cda2b3147b2"
                       voltage: 40
                       temperature: 70
                       status: "normal"
                       motor_speed: "off"
-                    - id_sensor: "f418cf2e-22fb-40e3-9f31-2578d79db87f"
+                    - id_sensor: "6203df17-11fc-4530-9468-18bdd9d18f1b"
                       voltage: 50
                       temperature: 80
                       status: "preventive"
                       motor_speed: "normal"
-                    - id_sensor: "90f7ec5d-56c9-423d-92ea-9721b685f9f9"
+                    - id_sensor: "7e4043ed-c71a-42b2-92e3-0fa6aeeb1fdc"
                       voltage: 70
                       temperature: 100
                       status: "emergency"
                       motor_speed: "high"
-                    - id_sensor: "74ede588-0fdc-4a85-8232-6455e163dbfb"
+                    - id_sensor: "e6eefc31-2b25-4aa6-9008-34592a173672"
                       voltage: 90
                       temperature: 130
                       status: "normal"

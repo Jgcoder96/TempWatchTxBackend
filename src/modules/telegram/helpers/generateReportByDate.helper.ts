@@ -1,5 +1,9 @@
 import { getDataByDate, getEventsByDate } from '../models';
-import { generateGraph, generarReportePDF, parseSensorEvent } from '../utils';
+import {
+  generateGraphByDate,
+  generatePDFByDate,
+  parseSensorEvent,
+} from '../utils';
 
 interface reportFilters {
   id_sensor: string;
@@ -10,7 +14,7 @@ interface reportFilters {
   };
 }
 
-export const generateReport = async (
+export const generateReportByDate = async (
   filters: reportFilters,
 ): Promise<Buffer> => {
   try {
@@ -37,8 +41,8 @@ export const generateReport = async (
 
     const parseSensorEvents = parseSensorEvent(sensorEvents);
 
-    const graph = await generateGraph(sensorData);
-    const report: Buffer = await generarReportePDF(
+    const graph = await generateGraphByDate(sensorData);
+    const report: Buffer = await generatePDFByDate(
       id_sensor,
       newDate,
       graph,

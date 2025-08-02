@@ -1,4 +1,5 @@
-export { generarReportePDF } from './generatePdf.helper';
-export { generateGraph } from './generateGraph.helper';
-export { parseSensorEvent } from './parseData.util';
+export { generateGraphByDate } from './generateGraphByDate.helper';
+export { generateGraphByRange } from './generateGraphByRange';
+export { generatePDFByDate } from './generatePdfByDate.helper';
 export { generatePDFByRange } from './generatePdfByRange.helper';
+export { parseSensorEvent } from './parseData.util';

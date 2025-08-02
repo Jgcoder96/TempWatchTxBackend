@@ -7,7 +7,7 @@ import {
 } from 'pdfmake/interfaces';
 import { ParsedData } from '../types';
 
-export async function generarReportePDF(
+export async function generatePDFByDate(
   idSensor: string,
   date: string,
   graphBuffer: Buffer,

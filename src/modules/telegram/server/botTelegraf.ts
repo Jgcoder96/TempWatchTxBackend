@@ -2,13 +2,39 @@ import { Telegraf, Markup, Context, session, TelegramError } from 'telegraf';
 import { envs } from '../../../config';
 import { getSensorList, getLastSensorSample } from '../models';
 import { PrismaClient } from '@prisma/client';
-import { generateReport } from '../helpers';
+// Asumo que estas funciones existen y las simulo para que el código sea completo.
+// Debes reemplazar estas implementaciones con las tuyas.
+import { generateReportByDate, generateReportByRange } from '../helpers';
 
 const prisma = new PrismaClient();
 
+// --- NUEVAS INTERFACES Y TIPOS ---
+// Interfaz de fecha proporcionada en la solicitud
+interface Date {
+  day: number;
+  month: number;
+  year: number;
+}
+
+// Interfaz para el reporte por rango, proporcionada en la solicitud
+interface ReportByRangeFilters {
+  id_sensor: string;
+  startDate: Date;
+  endDate: Date;
+}
+
+// Interfaz para el reporte por día (la que ya usabas)
+interface ReportByDayFilters {
+  id_sensor: string;
+  date: Date;
+}
+
+// --- ESTADO DE SESIÓN AMPLIADO ---
 interface ReportState {
-  step: 'awaiting_date';
+  // Ahora tenemos más pasos para manejar el flujo del rango de fechas
+  step: 'awaiting_day_date' | 'awaiting_start_date' | 'awaiting_end_date';
   sensorId: string;
+  startDate?: Date; // Campo opcional para guardar la fecha de inicio
 }
 
 interface MySession {
@@ -18,6 +44,19 @@ interface MySession {
 interface MyContext extends Context {
   session: MySession;
 }
+
+// Función auxiliar para parsear la fecha
+const parseDate = (dateText: string): Date | null => {
+  const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+  const match = dateText.match(dateRegex);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  return {
+    day: parseInt(day, 10),
+    month: parseInt(month, 10),
+    year: parseInt(year, 10),
+  };
+};
 
 const sendMainMenu = (ctx: MyContext, isEdit = false) => {
   const nombreUsuario = ctx.from?.first_name || 'usuario';
@@ -31,7 +70,8 @@ const sendMainMenu = (ctx: MyContext, isEdit = false) => {
 
   try {
     if (isEdit) {
-      return ctx.editMessageText(text, keyboard);
+      // Usamos catch para manejar el error "message is not modified"
+      return ctx.editMessageText(text, keyboard).catch(() => {});
     }
     return ctx.reply(text, keyboard);
   } catch (error) {
@@ -60,10 +100,12 @@ export const botTelegraf = () => {
     if (ctx.session) {
       delete ctx.session.reportState;
     }
-
     await ctx.answerCbQuery('Volviendo al menú principal...');
     await sendMainMenu(ctx, true);
   });
+
+  // -- (Las acciones ver_sensores y monitorear_sensores se mantienen igual) --
+  // ... (código sin cambios aquí)
 
   bot.action('ver_sensores', async (ctx) => {
     try {
@@ -197,7 +239,25 @@ export const botTelegraf = () => {
     }
   });
 
+  // --- SECCIÓN DE REPORTES MODIFICADA ---
+
+  // NUEVO PASO 1: Elegir el tipo de reporte
   bot.action('generar_reporte', async (ctx) => {
+    await ctx.answerCbQuery();
+    const text = '📄 Elige el tipo de reporte que deseas generar:';
+    const keyboard = Markup.inlineKeyboard([
+      Markup.button.callback('Por Día', 'report_by_day'),
+      Markup.button.callback('Por Rango de Fechas', 'report_by_range'),
+      Markup.button.callback('⬅️ Volver al menú', 'volver_menu'),
+    ]);
+    await ctx.editMessageText(text, keyboard);
+  });
+
+  // Función de ayuda para mostrar la lista de sensores y evitar duplicar código
+  const showSensorSelectionForReport = async (
+    ctx: MyContext,
+    reportType: 'day' | 'range',
+  ) => {
     try {
       await ctx.answerCbQuery('Cargando lista de sensores...');
       const sensores = await getSensorList();
@@ -210,16 +270,20 @@ export const botTelegraf = () => {
         });
       }
 
+      // El prefijo del callback cambia según el tipo de reporte
+      const callbackPrefix =
+        reportType === 'day' ? 'report_sensor_day' : 'report_sensor_range';
+
       const sensorButtons = sensores.map((sensor) =>
         Markup.button.callback(
           `📄 ${sensor.name}`,
-          `report_sensor:${sensor.id_sensor}`,
+          `${callbackPrefix}:${sensor.id_sensor}`,
         ),
       );
 
       const keyboard = Markup.inlineKeyboard([
         ...chunk(sensorButtons, 2),
-        [Markup.button.callback('⬅️ Volver al menú', 'volver_menu')],
+        [Markup.button.callback('⬅️ Volver', 'generar_reporte')],
       ]);
 
       await ctx.editMessageText(
@@ -227,22 +291,53 @@ export const botTelegraf = () => {
         keyboard,
       );
     } catch (error) {
-      console.error('Error en generar_reporte (paso 1):', error);
+      console.error(
+        `Error en showSensorSelectionForReport (${reportType}):`,
+        error,
+      );
       await ctx.editMessageText('❌ Ocurrió un error al cargar los sensores.');
     }
-  });
+  };
 
-  bot.action(/^report_sensor:(.+)/, async (ctx) => {
+  // PASO 2 (Opción A): El usuario eligió "Por Día"
+  bot.action('report_by_day', (ctx) =>
+    showSensorSelectionForReport(ctx, 'day'),
+  );
+
+  // PASO 2 (Opción B): El usuario eligió "Por Rango"
+  bot.action('report_by_range', (ctx) =>
+    showSensorSelectionForReport(ctx, 'range'),
+  );
+
+  // PASO 3 (Flujo por Día): El usuario seleccionó un sensor para el reporte diario
+  bot.action(/^report_sensor_day:(.+)/, async (ctx) => {
     const sensorId = ctx.match[1];
-
     ctx.session.reportState = {
-      step: 'awaiting_date',
+      step: 'awaiting_day_date', // Estado específico para fecha de día
       sensorId: sensorId,
     };
-
     await ctx.answerCbQuery();
     await ctx.editMessageText(
       '📅 Por favor, ingresa la fecha para el reporte.\n\nUsa el formato: *DD/MM/AAAA*',
+      {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard([
+          Markup.button.callback('❌ Cancelar', 'cancel_report'),
+        ]).reply_markup,
+      },
+    );
+  });
+
+  // PASO 3 (Flujo por Rango): El usuario seleccionó un sensor para el reporte por rango
+  bot.action(/^report_sensor_range:(.+)/, async (ctx) => {
+    const sensorId = ctx.match[1];
+    ctx.session.reportState = {
+      step: 'awaiting_start_date', // Estado para la fecha de inicio
+      sensorId: sensorId,
+    };
+    await ctx.answerCbQuery();
+    await ctx.editMessageText(
+      '🗓️ Por favor, ingresa la *fecha de inicio* del rango.\n\nUsa el formato: *DD/MM/AAAA*',
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
@@ -257,21 +352,29 @@ export const botTelegraf = () => {
       delete ctx.session.reportState;
     }
     await ctx.answerCbQuery('Operación cancelada.');
-    await sendMainMenu(ctx, true);
+    // Regresa al menú de selección de tipo de reporte
+    await ctx.editMessageText(
+      '📄 Elige el tipo de reporte que deseas generar:',
+      Markup.inlineKeyboard([
+        Markup.button.callback('Por Día', 'report_by_day'),
+        Markup.button.callback('Por Rango de Fechas', 'report_by_range'),
+        Markup.button.callback('⬅️ Volver al menú', 'volver_menu'),
+      ]),
+    );
   });
 
+  // MANEJADOR DE TEXTO CENTRALIZADO para recibir las fechas
   bot.on('text', async (ctx) => {
-    if (ctx.session?.reportState?.step !== 'awaiting_date') {
+    // Si no estamos esperando una fecha, no hacemos nada
+    if (!ctx.session?.reportState?.step) {
       return;
     }
 
+    const { reportState } = ctx.session;
     const dateText = ctx.message.text;
-    const sensorId = ctx.session.reportState.sensorId;
+    const parsedDate = parseDate(dateText);
 
-    const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    const match = dateText.match(dateRegex);
-
-    if (!match) {
+    if (!parsedDate) {
       await ctx.reply(
         'Formato de fecha inválido. 😕\nPor favor, inténtalo de nuevo con el formato *DD/MM/AAAA*.',
         { parse_mode: 'Markdown' },
@@ -279,38 +382,119 @@ export const botTelegraf = () => {
       return;
     }
 
-    await ctx.reply('Generando tu reporte, por favor espera un momento... ⏳');
+    // Usamos un switch para manejar los diferentes pasos del proceso
+    switch (reportState.step) {
+      case 'awaiting_day_date': {
+        await ctx.reply('Generando tu reporte diario, por favor espera... ⏳');
+        try {
+          const filters: ReportByDayFilters = {
+            id_sensor: reportState.sensorId,
+            date: parsedDate,
+          };
 
-    try {
-      const [, day, month, year] = match;
+          const pdfBuffer: Buffer = await generateReportByDate(filters);
 
-      const filters = {
-        id_sensor: sensorId,
-        date: {
-          day: parseInt(day, 10),
-          month: parseInt(month, 10),
-          year: parseInt(year, 10),
-        },
-      };
+          await ctx.sendDocument(
+            {
+              source: pdfBuffer,
+              filename: `Reporte-${filters.id_sensor}-${dateText.replace(/\//g, '-')}.pdf`,
+            },
+            {
+              caption: `✅ ¡Aquí tienes tu reporte para la fecha ${dateText}!`,
+            },
+          );
+        } catch (error) {
+          console.error('Error al generar reporte por día:', error);
+          await ctx.reply('❌ Ocurrió un error al generar tu reporte.');
+        } finally {
+          delete ctx.session.reportState; // Limpiamos la sesión
+        }
+        break;
+      }
 
-      const pdfBuffer: Buffer = await generateReport(filters);
+      case 'awaiting_start_date': {
+        // Guardamos la fecha de inicio y pasamos al siguiente paso
+        reportState.startDate = parsedDate;
+        reportState.step = 'awaiting_end_date';
+        await ctx.reply(
+          '✅ Fecha de inicio guardada.\n\nAhora, ingresa la *fecha de fin* del rango.\n\nUsa el formato: *DD/MM/AAAA*',
+          { parse_mode: 'Markdown' },
+        );
+        break;
+      }
 
-      await ctx.sendDocument(
-        {
-          source: pdfBuffer,
-          filename: `Reporte-${sensorId}-${day}-${month}-${year}.pdf`,
-        },
-        {
-          caption: `✅ ¡Aquí tienes tu reporte para la fecha ${dateText}!`,
-        },
-      );
-    } catch (error) {
-      console.error('Error al generar o enviar el reporte PDF:', error);
-      await ctx.reply(
-        '❌ Lo siento, ocurrió un error al generar tu reporte. Por favor, asegúrate de que hay datos para esa fecha e inténtalo de nuevo.',
-      );
-    } finally {
-      delete ctx.session.reportState;
+      case 'awaiting_end_date': {
+        const startDate = reportState.startDate!;
+        const endDate = parsedDate;
+
+        // Validación: la fecha de fin no puede ser anterior a la de inicio
+        const startDateTime = new Date(
+          startDate.year,
+          startDate.month - 1,
+          startDate.day,
+        ).getTime();
+        const endDateTime = new Date(
+          endDate.year,
+          endDate.month - 1,
+          endDate.day,
+        ).getTime();
+
+        if (endDateTime < startDateTime) {
+          await ctx.reply(
+            '❌ La fecha de fin no puede ser anterior a la fecha de inicio. Por favor, ingresa una *fecha de fin* válida.',
+            { parse_mode: 'Markdown' },
+          );
+          return; // No cambiamos el estado, el usuario debe intentarlo de nuevo.
+        }
+
+        // --- NUEVA VALIDACIÓN: LÍMITE DE 5 DÍAS ---
+        const ONE_DAY_IN_MS = 1000 * 60 * 60 * 24;
+        const differenceInDays = (endDateTime - startDateTime) / ONE_DAY_IN_MS;
+
+        // Comprobamos si la diferencia es mayor a 5 días
+        // Ej: del 1 al 7 son 6 días de diferencia.
+        if (differenceInDays > 5) {
+          await ctx.reply(
+            '❌ El rango solicitado supera el límite de 5 días.\n\nPor favor, ingresa una *fecha de fin* que esté dentro del límite permitido.',
+            { parse_mode: 'Markdown' },
+          );
+          return; // Salimos y esperamos una nueva fecha de fin, sin cambiar el estado.
+        }
+        // --- FIN DE LA NUEVA VALIDACIÓN ---
+
+        await ctx.reply(
+          'Generando tu reporte por rango, por favor espera... ⏳',
+        );
+        try {
+          const filters: ReportByRangeFilters = {
+            id_sensor: reportState.sensorId,
+            startDate: startDate,
+            endDate: endDate,
+          };
+
+          // Aquí llamas a tu nueva función para generar el reporte por rango
+          const pdfBuffer: Buffer = await generateReportByRange(filters);
+
+          const startDateString = `${startDate.day.toString().padStart(2, '0')}/${startDate.month.toString().padStart(2, '0')}/${startDate.year}`;
+          const endDateString = `${endDate.day.toString().padStart(2, '0')}/${endDate.month.toString().padStart(2, '0')}/${endDate.year}`;
+
+          await ctx.sendDocument(
+            {
+              source: pdfBuffer,
+              filename: `Reporte-${filters.id_sensor}-${startDateString.replace(/\//g, '-')}_a_${endDateString.replace(/\//g, '-')}.pdf`,
+            },
+            {
+              caption: `✅ ¡Aquí tienes tu reporte del ${startDateString} al ${endDateString}!`,
+            },
+          );
+        } catch (error) {
+          console.error('Error al generar reporte por rango:', error);
+          await ctx.reply('❌ Ocurrió un error al generar tu reporte.');
+        } finally {
+          delete ctx.session.reportState; // Limpiamos la sesión
+        }
+        break;
+      }
     }
   });
 

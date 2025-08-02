@@ -81,7 +81,7 @@ function procesarDatosConSaltos(
   return processedPoints;
 }
 
-export const generateGraph = async (data: Data[]) => {
+export const generateGraphByDate = async (data: Data[]) => {
   try {
     const chartData = procesarDatosConSaltos(data, 3);
 

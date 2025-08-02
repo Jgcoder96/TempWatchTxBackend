@@ -5,12 +5,12 @@ import {
   TFontDictionary,
   Content,
 } from 'pdfmake/interfaces';
-import { ParsedData } from '../types'; // Asegúrate de que esta ruta de importación sea correcta
+import { ParsedData } from '../types';
 
-// MODIFICACIÓN: La función ahora retorna una Promise<Buffer>
-export async function generarReportePDF(
+export async function generatePDFByRange(
   idSensor: string,
-  date: string,
+  startDate: string,
+  endDate: string,
   graphBuffer: Buffer,
   dataEvent: ParsedData,
 ): Promise<Buffer> {
@@ -117,7 +117,15 @@ export async function generarReportePDF(
         margin: [0, 15, 0, 10],
       },
       {
-        text: [{ text: 'Fecha de los datos: ', bold: true }, date],
+        text: [
+          { text: 'Fecha de inicio de los datos: ', bold: true },
+          startDate,
+        ],
+        alignment: 'left',
+        margin: [0, 2, 0, 10],
+      },
+      {
+        text: [{ text: 'Fecha de fin de los datos: ', bold: true }, endDate],
         alignment: 'left',
         margin: [0, 2, 0, 10],
       },
@@ -151,12 +159,10 @@ export async function generarReportePDF(
     },
   };
 
-  // MODIFICACIÓN: Lógica de la Promesa para generar el PDF en memoria (Buffer)
   return new Promise<Buffer>((resolve, reject) => {
     try {
       const pdfDoc = printer.createPdfKitDocument(docDefinition);
 
-      // Array para almacenar los trozos (chunks) de datos del PDF
       const chunks: Buffer[] = [];
 
       pdfDoc.on('data', (chunk) => {
@@ -164,16 +170,14 @@ export async function generarReportePDF(
       });
 
       pdfDoc.on('end', () => {
-        // Une todos los chunks en un solo Buffer cuando la generación termina
         const result = Buffer.concat(chunks);
-        resolve(result); // Resuelve la promesa con el Buffer del PDF
+        resolve(result);
       });
 
       pdfDoc.on('error', (err) => {
         reject(err);
       });
 
-      // Finaliza el documento para que los eventos 'data' y 'end' se disparen
       pdfDoc.end();
     } catch (error) {
       reject(error);

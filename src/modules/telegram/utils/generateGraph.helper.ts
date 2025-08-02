@@ -17,6 +17,8 @@ interface Data {
   date: Date;
 }
 
+type DataPoint = { x: number; y: number };
+
 Chart.register(
   LineController,
   LineElement,
@@ -35,9 +37,57 @@ function roundDownToNearest(value: number, multiple: number) {
   return Math.floor(value / multiple) * multiple;
 }
 
+function procesarDatosConSaltos(
+  data: Data[],
+  gapThresholdMinutes: number,
+): DataPoint[] {
+  if (!data || data.length < 2) {
+    return data.map((d) => ({
+      x: new Date(d.date).getTime(),
+      y: d.temperature,
+    }));
+  }
+
+  const sortedData = [...data].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  );
+
+  const gapThresholdMs = gapThresholdMinutes * 60 * 1000;
+  const processedPoints: DataPoint[] = [];
+
+  for (let i = 0; i < sortedData.length; i++) {
+    const currentPoint = sortedData[i];
+    const currentTime = new Date(currentPoint.date).getTime();
+
+    if (i > 0) {
+      const prevPoint = sortedData[i - 1];
+      const prevTime = new Date(prevPoint.date).getTime();
+      const timeDiff = currentTime - prevTime;
+
+      if (timeDiff > gapThresholdMs) {
+        processedPoints.push({
+          x: currentTime,
+          y: NaN,
+        });
+      }
+    }
+
+    processedPoints.push({
+      x: currentTime,
+      y: currentPoint.temperature,
+    });
+  }
+
+  return processedPoints;
+}
+
 export const generateGraph = async (data: Data[]) => {
   try {
-    const temperaturas = data.map((d) => d.temperature);
+    const chartData = procesarDatosConSaltos(data, 3);
+
+    const temperaturas = data
+      .map((d) => d.temperature)
+      .filter((t) => !isNaN(t));
     const maxTemp = Math.max(...temperaturas);
 
     let roundMultiple;
@@ -55,8 +105,8 @@ export const generateGraph = async (data: Data[]) => {
     const stepSize = roundMultiple;
 
     const tiempos = data.map((d) => new Date(d.date).getTime());
-    const minTime = roundDownToNearest(Math.min(...tiempos), 1000 * 60 * 60); // Redondea a la hora inferior
-    const maxTime = roundUpToNearest(Math.max(...tiempos), 1000 * 60 * 60); // Redondea a la hora superior
+    const minTime = roundDownToNearest(Math.min(...tiempos), 1000 * 60 * 60);
+    const maxTime = roundUpToNearest(Math.max(...tiempos), 1000 * 60 * 60);
 
     const canvas = new Canvas(1200, 500);
 
@@ -66,10 +116,7 @@ export const generateGraph = async (data: Data[]) => {
         datasets: [
           {
             label: 'Temperatura (°C)',
-            data: data.map((d) => ({
-              x: new Date(d.date).getTime(),
-              y: d.temperature,
-            })),
+            data: chartData,
             borderColor: '#4CAF50',
             borderWidth: 2,
             fill: false,
@@ -194,6 +241,9 @@ export const generateGraph = async (data: Data[]) => {
                 });
               },
               label: (context) => {
+                if (context.parsed.y === null || isNaN(context.parsed.y)) {
+                  return 'Datos no disponibles';
+                }
                 return `Temperatura: ${context.parsed.y.toFixed(1)} °C`;
               },
             },
@@ -216,7 +266,7 @@ export const generateGraph = async (data: Data[]) => {
       },
     });
 
-    const pngBuffer = await canvas.toBuffer('png', { matte: 'white' });
+    const pngBuffer = await canvas.toBuffer('png', { matte: '#FFFFFF' });
     chart.destroy();
     return pngBuffer;
   } catch (error) {

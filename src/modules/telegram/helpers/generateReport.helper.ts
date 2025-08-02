@@ -1,7 +1,5 @@
 import { getDataByDate, getEventsByDate } from '../models';
-import { generateGraph } from './generateGraph.helper';
-import { generarReportePDF } from './generatePdf.helper';
-import { parseSensorEvent } from '../utils';
+import { generateGraph, generarReportePDF, parseSensorEvent } from '../utils';
 
 interface reportFilters {
   id_sensor: string;
@@ -30,8 +28,6 @@ export const generateReport = async (
       },
       id_sensor,
     );
-
-    console.log(sensorData);
 
     const sensorEvents = await getEventsByDate(id_sensor, {
       day,

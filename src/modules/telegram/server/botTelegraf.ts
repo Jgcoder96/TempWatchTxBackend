@@ -2,39 +2,31 @@ import { Telegraf, Markup, Context, session, TelegramError } from 'telegraf';
 import { envs } from '../../../config';
 import { getSensorList, getLastSensorSample } from '../models';
 import { PrismaClient } from '@prisma/client';
-// Asumo que estas funciones existen y las simulo para que el código sea completo.
-// Debes reemplazar estas implementaciones con las tuyas.
 import { generateReportByDate, generateReportByRange } from '../helpers';
 
 const prisma = new PrismaClient();
 
-// --- NUEVAS INTERFACES Y TIPOS ---
-// Interfaz de fecha proporcionada en la solicitud
 interface Date {
   day: number;
   month: number;
   year: number;
 }
 
-// Interfaz para el reporte por rango, proporcionada en la solicitud
 interface ReportByRangeFilters {
   id_sensor: string;
   startDate: Date;
   endDate: Date;
 }
 
-// Interfaz para el reporte por día (la que ya usabas)
 interface ReportByDayFilters {
   id_sensor: string;
   date: Date;
 }
 
-// --- ESTADO DE SESIÓN AMPLIADO ---
 interface ReportState {
-  // Ahora tenemos más pasos para manejar el flujo del rango de fechas
   step: 'awaiting_day_date' | 'awaiting_start_date' | 'awaiting_end_date';
   sensorId: string;
-  startDate?: Date; // Campo opcional para guardar la fecha de inicio
+  startDate?: Date;
 }
 
 interface MySession {
@@ -45,7 +37,6 @@ interface MyContext extends Context {
   session: MySession;
 }
 
-// Función auxiliar para parsear la fecha
 const parseDate = (dateText: string): Date | null => {
   const dateRegex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
   const match = dateText.match(dateRegex);
@@ -70,7 +61,6 @@ const sendMainMenu = (ctx: MyContext, isEdit = false) => {
 
   try {
     if (isEdit) {
-      // Usamos catch para manejar el error "message is not modified"
       return ctx.editMessageText(text, keyboard).catch(() => {});
     }
     return ctx.reply(text, keyboard);
@@ -103,9 +93,6 @@ export const botTelegraf = () => {
     await ctx.answerCbQuery('Volviendo al menú principal...');
     await sendMainMenu(ctx, true);
   });
-
-  // -- (Las acciones ver_sensores y monitorear_sensores se mantienen igual) --
-  // ... (código sin cambios aquí)
 
   bot.action('ver_sensores', async (ctx) => {
     try {
@@ -239,9 +226,6 @@ export const botTelegraf = () => {
     }
   });
 
-  // --- SECCIÓN DE REPORTES MODIFICADA ---
-
-  // NUEVO PASO 1: Elegir el tipo de reporte
   bot.action('generar_reporte', async (ctx) => {
     await ctx.answerCbQuery();
     const text = '📄 Elige el tipo de reporte que deseas generar:';
@@ -253,7 +237,6 @@ export const botTelegraf = () => {
     await ctx.editMessageText(text, keyboard);
   });
 
-  // Función de ayuda para mostrar la lista de sensores y evitar duplicar código
   const showSensorSelectionForReport = async (
     ctx: MyContext,
     reportType: 'day' | 'range',
@@ -270,7 +253,6 @@ export const botTelegraf = () => {
         });
       }
 
-      // El prefijo del callback cambia según el tipo de reporte
       const callbackPrefix =
         reportType === 'day' ? 'report_sensor_day' : 'report_sensor_range';
 
@@ -299,21 +281,18 @@ export const botTelegraf = () => {
     }
   };
 
-  // PASO 2 (Opción A): El usuario eligió "Por Día"
   bot.action('report_by_day', (ctx) =>
     showSensorSelectionForReport(ctx, 'day'),
   );
 
-  // PASO 2 (Opción B): El usuario eligió "Por Rango"
   bot.action('report_by_range', (ctx) =>
     showSensorSelectionForReport(ctx, 'range'),
   );
 
-  // PASO 3 (Flujo por Día): El usuario seleccionó un sensor para el reporte diario
   bot.action(/^report_sensor_day:(.+)/, async (ctx) => {
     const sensorId = ctx.match[1];
     ctx.session.reportState = {
-      step: 'awaiting_day_date', // Estado específico para fecha de día
+      step: 'awaiting_day_date',
       sensorId: sensorId,
     };
     await ctx.answerCbQuery();
@@ -328,11 +307,10 @@ export const botTelegraf = () => {
     );
   });
 
-  // PASO 3 (Flujo por Rango): El usuario seleccionó un sensor para el reporte por rango
   bot.action(/^report_sensor_range:(.+)/, async (ctx) => {
     const sensorId = ctx.match[1];
     ctx.session.reportState = {
-      step: 'awaiting_start_date', // Estado para la fecha de inicio
+      step: 'awaiting_start_date',
       sensorId: sensorId,
     };
     await ctx.answerCbQuery();
@@ -352,7 +330,6 @@ export const botTelegraf = () => {
       delete ctx.session.reportState;
     }
     await ctx.answerCbQuery('Operación cancelada.');
-    // Regresa al menú de selección de tipo de reporte
     await ctx.editMessageText(
       '📄 Elige el tipo de reporte que deseas generar:',
       Markup.inlineKeyboard([
@@ -363,9 +340,7 @@ export const botTelegraf = () => {
     );
   });
 
-  // MANEJADOR DE TEXTO CENTRALIZADO para recibir las fechas
   bot.on('text', async (ctx) => {
-    // Si no estamos esperando una fecha, no hacemos nada
     if (!ctx.session?.reportState?.step) {
       return;
     }
@@ -382,7 +357,6 @@ export const botTelegraf = () => {
       return;
     }
 
-    // Usamos un switch para manejar los diferentes pasos del proceso
     switch (reportState.step) {
       case 'awaiting_day_date': {
         await ctx.reply('Generando tu reporte diario, por favor espera... ⏳');
@@ -407,13 +381,12 @@ export const botTelegraf = () => {
           console.error('Error al generar reporte por día:', error);
           await ctx.reply('❌ Ocurrió un error al generar tu reporte.');
         } finally {
-          delete ctx.session.reportState; // Limpiamos la sesión
+          delete ctx.session.reportState;
         }
         break;
       }
 
       case 'awaiting_start_date': {
-        // Guardamos la fecha de inicio y pasamos al siguiente paso
         reportState.startDate = parsedDate;
         reportState.step = 'awaiting_end_date';
         await ctx.reply(
@@ -427,7 +400,6 @@ export const botTelegraf = () => {
         const startDate = reportState.startDate!;
         const endDate = parsedDate;
 
-        // Validación: la fecha de fin no puede ser anterior a la de inicio
         const startDateTime = new Date(
           startDate.year,
           startDate.month - 1,
@@ -444,23 +416,19 @@ export const botTelegraf = () => {
             '❌ La fecha de fin no puede ser anterior a la fecha de inicio. Por favor, ingresa una *fecha de fin* válida.',
             { parse_mode: 'Markdown' },
           );
-          return; // No cambiamos el estado, el usuario debe intentarlo de nuevo.
+          return;
         }
 
-        // --- NUEVA VALIDACIÓN: LÍMITE DE 5 DÍAS ---
         const ONE_DAY_IN_MS = 1000 * 60 * 60 * 24;
         const differenceInDays = (endDateTime - startDateTime) / ONE_DAY_IN_MS;
 
-        // Comprobamos si la diferencia es mayor a 5 días
-        // Ej: del 1 al 7 son 6 días de diferencia.
         if (differenceInDays > 5) {
           await ctx.reply(
             '❌ El rango solicitado supera el límite de 5 días.\n\nPor favor, ingresa una *fecha de fin* que esté dentro del límite permitido.',
             { parse_mode: 'Markdown' },
           );
-          return; // Salimos y esperamos una nueva fecha de fin, sin cambiar el estado.
+          return;
         }
-        // --- FIN DE LA NUEVA VALIDACIÓN ---
 
         await ctx.reply(
           'Generando tu reporte por rango, por favor espera... ⏳',
@@ -472,7 +440,6 @@ export const botTelegraf = () => {
             endDate: endDate,
           };
 
-          // Aquí llamas a tu nueva función para generar el reporte por rango
           const pdfBuffer: Buffer = await generateReportByRange(filters);
 
           const startDateString = `${startDate.day.toString().padStart(2, '0')}/${startDate.month.toString().padStart(2, '0')}/${startDate.year}`;
@@ -491,7 +458,7 @@ export const botTelegraf = () => {
           console.error('Error al generar reporte por rango:', error);
           await ctx.reply('❌ Ocurrió un error al generar tu reporte.');
         } finally {
-          delete ctx.session.reportState; // Limpiamos la sesión
+          delete ctx.session.reportState;
         }
         break;
       }
